@@ -65,6 +65,7 @@ NSString* const GCDWebServerOption_AutomaticallyMapHEADToGET = @"AutomaticallyMa
 NSString* const GCDWebServerOption_ConnectedStateCoalescingInterval = @"ConnectedStateCoalescingInterval";
 NSString* const GCDWebServerOption_DispatchQueuePriority = @"DispatchQueuePriority";
 NSString* const GCDWebServerOption_UseNetworkFramework = @"UseNetworkFramework";
+NSString* const GCDWebServerOption_TlsIdentity = @"TlsIdentity";
 #if TARGET_OS_IPHONE
 NSString* const GCDWebServerOption_AutomaticallySuspendInBackground = @"AutomaticallySuspendInBackground";
 #endif
@@ -522,6 +523,8 @@ static inline NSString* _EncodeBase64(NSString* string) {
   BOOL bindToLocalhost = [(NSNumber*)_GetOption(_options, GCDWebServerOption_BindToLocalhost, @NO) boolValue];
   NSUInteger maxPendingConnections = [(NSNumber*)_GetOption(_options, GCDWebServerOption_MaxPendingConnections, @16) unsignedIntegerValue];
   BOOL useNetworkFramework = [(NSNumber*)_GetOption(_options, GCDWebServerOption_UseNetworkFramework, @YES) boolValue];
+  SecIdentityRef identity = (__bridge SecIdentityRef)_GetOption(_options, GCDWebServerOption_TlsIdentity, nil);
+  
 
   struct sockaddr_in addr4;
   int listeningSocket4;
@@ -599,7 +602,25 @@ static inline NSString* _EncodeBase64(NSString* string) {
       const struct sockaddr* localSockAddr = nw_endpoint_get_address(localEndpoint);
       NSData* localAddress = [NSData dataWithBytes:localSockAddr length:sizeof(*localSockAddr)];
       
-      nw_parameters_t params = nw_parameters_create_secure_tcp(NW_PARAMETERS_DISABLE_PROTOCOL, NW_PARAMETERS_DEFAULT_CONFIGURATION);
+      nw_parameters_configure_protocol_block_t configureTls = NW_PARAMETERS_DISABLE_PROTOCOL;
+      if (identity != nil) {
+        configureTls = ^(nw_protocol_options_t tlsOptions) {
+          sec_protocol_options_t sec_options = nw_tls_copy_sec_protocol_options(tlsOptions);
+
+          sec_identity_t nwidentity = sec_identity_create(identity);
+          
+          sec_protocol_options_set_local_identity(sec_options, nwidentity);
+          sec_protocol_options_set_tls_renegotiation_enabled(sec_options, true);
+
+          if (@available(iOS 13.0, macos 10.15, watchos 6.0, tvos 13.0, *)) {
+            sec_protocol_options_append_tls_ciphersuite_group(sec_options, tls_ciphersuite_group_ats);
+          } else {
+            sec_protocol_options_add_tls_ciphersuite_group(sec_options, kSSLCiphersuiteGroupATS);
+          }
+        };
+      }
+      
+      nw_parameters_t params = nw_parameters_create_secure_tcp(configureTls, NW_PARAMETERS_DEFAULT_CONFIGURATION);
       nw_parameters_set_local_only(params, bindToLocalhost);
       nw_parameters_set_local_endpoint(params, localEndpoint);
       

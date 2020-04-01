@@ -196,6 +196,8 @@ extern NSString* const GCDWebServerOption_DispatchQueuePriority;
 
 extern NSString* const GCDWebServerOption_UseNetworkFramework;
 
+extern NSString* const GCDWebServerOption_TlsIdentity;
+
 #if TARGET_OS_IPHONE
 
 /**
