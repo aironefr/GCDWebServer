@@ -27,6 +27,7 @@
 
 #import <os/object.h>
 #import <sys/socket.h>
+#import <Network/Network.h>
 
 /**
  *  All GCDWebServer headers.
@@ -182,6 +183,7 @@ extern NSString* GCDWebServerStringFromSockAddr(const struct sockaddr* addr, BOO
 
 @interface GCDWebServerConnection ()
 - (instancetype)initWithServer:(GCDWebServer*)server localAddress:(NSData*)localAddress remoteAddress:(NSData*)remoteAddress socket:(CFSocketNativeHandle)socket;
+- (instancetype)initWithServer:(GCDWebServer*)server localAddress:(NSData*)localAddress remoteAddress:(NSData*)remoteAddress connection:(nw_connection_t)connection API_AVAILABLE(macos(10.14), ios(12.0), watchos(5.0), tvos(12.0));
 @end
 
 @interface GCDWebServer ()

@@ -194,6 +194,8 @@ extern NSString* const GCDWebServerOption_ConnectedStateCoalescingInterval;
  */
 extern NSString* const GCDWebServerOption_DispatchQueuePriority;
 
+extern NSString* const GCDWebServerOption_UseNetworkFramework;
+
 #if TARGET_OS_IPHONE
 
 /**

@@ -26,6 +26,10 @@
 /* End PBXAggregateTarget section */
 
 /* Begin PBXBuildFile section */
+		C25050EC2424C45400D8E0A5 /* Network.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C2828B342423B87F000A9875 /* Network.framework */; };
+		C2828B352423B87F000A9875 /* Network.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C2828B342423B87F000A9875 /* Network.framework */; };
+		C2828B362423B89D000A9875 /* Network.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C2828B342423B87F000A9875 /* Network.framework */; };
+		C2828B382423B8A5000A9875 /* Network.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C2828B372423B8A5000A9875 /* Network.framework */; };
 		CEE28CF41AE0051F00F4023C /* GCDWebServers.h in Headers */ = {isa = PBXBuildFile; fileRef = CEE28CF31AE0051F00F4023C /* GCDWebServers.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		CEE28D091AE006C200F4023C /* GCDWebServer.h in Headers */ = {isa = PBXBuildFile; fileRef = E28BAE1618F99C810095C089 /* GCDWebServer.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		CEE28D0A1AE006C300F4023C /* GCDWebServer.h in Headers */ = {isa = PBXBuildFile; fileRef = E28BAE1618F99C810095C089 /* GCDWebServer.h */; settings = {ATTRIBUTES = (Public, ); }; };
@@ -283,6 +287,8 @@
 
 /* Begin PBXFileReference section */
 		8DD76FB20486AB0100D96B5E /* GCDWebServer */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = GCDWebServer; sourceTree = BUILT_PRODUCTS_DIR; };
+		C2828B342423B87F000A9875 /* Network.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Network.framework; path = System/Library/Frameworks/Network.framework; sourceTree = SDKROOT; };
+		C2828B372423B8A5000A9875 /* Network.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Network.framework; path = Platforms/AppleTVOS.platform/Developer/SDKs/AppleTVOS13.2.sdk/System/Library/Frameworks/Network.framework; sourceTree = DEVELOPER_DIR; };
 		CEE28CD11AE004D800F4023C /* GCDWebServers.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = GCDWebServers.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		CEE28CEF1AE0051F00F4023C /* GCDWebServers.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = GCDWebServers.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		CEE28CF21AE0051F00F4023C /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
@@ -361,6 +367,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C25050EC2424C45400D8E0A5 /* Network.framework in Frameworks */,
 				E2BE851118E79DAF0061360B /* SystemConfiguration.framework in Frameworks */,
 				E208D1B3167BB17E00500836 /* CoreServices.framework in Frameworks */,
 				E208D149167B76B700500836 /* CFNetwork.framework in Frameworks */,
@@ -373,6 +380,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C2828B352423B87F000A9875 /* Network.framework in Frameworks */,
 				CEE28D4C1AE0095600F4023C /* Foundation.framework in Frameworks */,
 				CEE28D511AE0098C00F4023C /* CoreServices.framework in Frameworks */,
 				CEE28D501AE0098600F4023C /* SystemConfiguration.framework in Frameworks */,
@@ -386,6 +394,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C2828B362423B89D000A9875 /* Network.framework in Frameworks */,
 				CEE28D6A1AE1ABAA00F4023C /* UIKit.framework in Frameworks */,
 				CEE28D571AE00AFE00F4023C /* MobileCoreServices.framework in Frameworks */,
 				CEE28D591AE00AFE00F4023C /* CFNetwork.framework in Frameworks */,
@@ -406,6 +415,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C2828B382423B8A5000A9875 /* Network.framework in Frameworks */,
 				E2DDD1C01BE69576002CE867 /* UIKit.framework in Frameworks */,
 				E2DDD1BE1BE6956F002CE867 /* MobileCoreServices.framework in Frameworks */,
 				E2DDD1B71BE6951A002CE867 /* CFNetwork.framework in Frameworks */,
@@ -470,6 +480,8 @@
 		CEE28D081AE0053E00F4023C /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				C2828B342423B87F000A9875 /* Network.framework */,
+				C2828B372423B8A5000A9875 /* Network.framework */,
 				E24A3C4021E2940600C58878 /* module.modulemap */,
 				CEE28CF31AE0051F00F4023C /* GCDWebServers.h */,
 				CEE28CF21AE0051F00F4023C /* Info.plist */,

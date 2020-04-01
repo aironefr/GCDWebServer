@@ -64,6 +64,7 @@ NSString* const GCDWebServerOption_ConnectionClass = @"ConnectionClass";
 NSString* const GCDWebServerOption_AutomaticallyMapHEADToGET = @"AutomaticallyMapHEADToGET";
 NSString* const GCDWebServerOption_ConnectedStateCoalescingInterval = @"ConnectedStateCoalescingInterval";
 NSString* const GCDWebServerOption_DispatchQueuePriority = @"DispatchQueuePriority";
+NSString* const GCDWebServerOption_UseNetworkFramework = @"UseNetworkFramework";
 #if TARGET_OS_IPHONE
 NSString* const GCDWebServerOption_AutomaticallySuspendInBackground = @"AutomaticallySuspendInBackground";
 #endif
@@ -520,37 +521,47 @@ static inline NSString* _EncodeBase64(NSString* string) {
   NSUInteger port = [(NSNumber*)_GetOption(_options, GCDWebServerOption_Port, @0) unsignedIntegerValue];
   BOOL bindToLocalhost = [(NSNumber*)_GetOption(_options, GCDWebServerOption_BindToLocalhost, @NO) boolValue];
   NSUInteger maxPendingConnections = [(NSNumber*)_GetOption(_options, GCDWebServerOption_MaxPendingConnections, @16) unsignedIntegerValue];
+  BOOL useNetworkFramework = [(NSNumber*)_GetOption(_options, GCDWebServerOption_UseNetworkFramework, @YES) boolValue];
 
   struct sockaddr_in addr4;
-  bzero(&addr4, sizeof(addr4));
-  addr4.sin_len = sizeof(addr4);
-  addr4.sin_family = AF_INET;
-  addr4.sin_port = htons(port);
-  addr4.sin_addr.s_addr = bindToLocalhost ? htonl(INADDR_LOOPBACK) : htonl(INADDR_ANY);
-  int listeningSocket4 = [self _createListeningSocket:NO localAddress:&addr4 length:sizeof(addr4) maxPendingConnections:maxPendingConnections error:error];
-  if (listeningSocket4 <= 0) {
-    return NO;
-  }
-  if (port == 0) {
-    struct sockaddr_in addr;
-    socklen_t addrlen = sizeof(addr);
-    if (getsockname(listeningSocket4, (struct sockaddr*)&addr, &addrlen) == 0) {
-      port = ntohs(addr.sin_port);
-    } else {
-      GWS_LOG_ERROR(@"Failed retrieving socket address: %s (%i)", strerror(errno), errno);
-    }
-  }
-
+  int listeningSocket4;
   struct sockaddr_in6 addr6;
-  bzero(&addr6, sizeof(addr6));
-  addr6.sin6_len = sizeof(addr6);
-  addr6.sin6_family = AF_INET6;
-  addr6.sin6_port = htons(port);
-  addr6.sin6_addr = bindToLocalhost ? in6addr_loopback : in6addr_any;
-  int listeningSocket6 = [self _createListeningSocket:YES localAddress:&addr6 length:sizeof(addr6) maxPendingConnections:maxPendingConnections error:error];
-  if (listeningSocket6 <= 0) {
-    close(listeningSocket4);
-    return NO;
+  int listeningSocket6;
+  
+  nw_listener_t listener;
+  __block BOOL listenerStarted = NO;
+  dispatch_group_t listenerDispatchGroup;
+  
+  if (!useNetworkFramework) {
+    bzero(&addr4, sizeof(addr4));
+    addr4.sin_len = sizeof(addr4);
+    addr4.sin_family = AF_INET;
+    addr4.sin_port = htons(port);
+    addr4.sin_addr.s_addr = bindToLocalhost ? htonl(INADDR_LOOPBACK) : htonl(INADDR_ANY);
+    listeningSocket4 = [self _createListeningSocket:NO localAddress:&addr4 length:sizeof(addr4) maxPendingConnections:maxPendingConnections error:error];
+    if (listeningSocket4 <= 0) {
+      return NO;
+    }
+    if (port == 0) {
+      struct sockaddr_in addr;
+      socklen_t addrlen = sizeof(addr);
+      if (getsockname(listeningSocket4, (struct sockaddr*)&addr, &addrlen) == 0) {
+        port = ntohs(addr.sin_port);
+      } else {
+        GWS_LOG_ERROR(@"Failed retrieving socket address: %s (%i)", strerror(errno), errno);
+      }
+    }
+
+    bzero(&addr6, sizeof(addr6));
+    addr6.sin6_len = sizeof(addr6);
+    addr6.sin6_family = AF_INET6;
+    addr6.sin6_port = htons(port);
+    addr6.sin6_addr = bindToLocalhost ? in6addr_loopback : in6addr_any;
+    listeningSocket6 = [self _createListeningSocket:YES localAddress:&addr6 length:sizeof(addr6) maxPendingConnections:maxPendingConnections error:error];
+    if (listeningSocket6 <= 0) {
+      close(listeningSocket4);
+      return NO;
+    }
   }
 
   _serverName = [(NSString*)_GetOption(_options, GCDWebServerOption_ServerName, NSStringFromClass([self class])) copy];
@@ -574,9 +585,83 @@ static inline NSString* _EncodeBase64(NSString* string) {
   _shouldAutomaticallyMapHEADToGET = [(NSNumber*)_GetOption(_options, GCDWebServerOption_AutomaticallyMapHEADToGET, @YES) boolValue];
   _disconnectDelay = [(NSNumber*)_GetOption(_options, GCDWebServerOption_ConnectedStateCoalescingInterval, @1.0) doubleValue];
   _dispatchQueuePriority = [(NSNumber*)_GetOption(_options, GCDWebServerOption_DispatchQueuePriority, @(DISPATCH_QUEUE_PRIORITY_DEFAULT)) longValue];
-
-  _source4 = [self _createDispatchSourceWithListeningSocket:listeningSocket4 isIPv6:NO];
-  _source6 = [self _createDispatchSourceWithListeningSocket:listeningSocket6 isIPv6:YES];
+  
+  if(useNetworkFramework) {
+    if (@available(iOS 12.0, macos 10.14, watchos 5.0, tvos 12.0, *)) {
+      listenerDispatchGroup = dispatch_group_create();
+      
+      const char* portstr = [[NSString stringWithFormat:@"%lu", (unsigned long)port] UTF8String];
+      nw_endpoint_t localEndpoint = nw_endpoint_create_host("::", portstr);
+      if (port == 0) {
+        // TODO(ermathon): is the port in the right order? ntohs?
+        port = nw_endpoint_get_port(localEndpoint);
+      }
+      const struct sockaddr* localSockAddr = nw_endpoint_get_address(localEndpoint);
+      NSData* localAddress = [NSData dataWithBytes:localSockAddr length:sizeof(*localSockAddr)];
+      
+      nw_parameters_t params = nw_parameters_create_secure_tcp(NW_PARAMETERS_DISABLE_PROTOCOL, NW_PARAMETERS_DEFAULT_CONFIGURATION);
+      nw_parameters_set_local_only(params, bindToLocalhost);
+      nw_parameters_set_local_endpoint(params, localEndpoint);
+      
+      //TODO(ermathon): check IPv6?
+      
+      listener = nw_listener_create(params);
+      nw_listener_set_queue(listener, dispatch_get_global_queue(_dispatchQueuePriority, 0));
+      nw_listener_set_state_changed_handler(listener, ^(nw_listener_state_t state, nw_error_t  _Nullable lerror) {
+        // TODO(ermathon): autoreleaseblock?
+        switch (state) {
+          case nw_listener_state_cancelled:
+          case nw_listener_state_failed:
+            if (lerror != nil) {
+              GWS_LOG_ERROR(@"Listener failure %i, ErrorDomain: %i, ErrorCode: %i", state, nw_error_get_error_domain(lerror), nw_error_get_error_code(lerror));
+            } else {
+              GWS_LOG_ERROR(@"Listener failure %i", state);
+            }
+            
+            if (!listenerStarted) {
+              if (lerror != nil) {
+                *error = CFBridgingRelease(nw_error_copy_cf_error(lerror));
+              }
+              dispatch_group_leave(listenerDispatchGroup);
+            }
+            break;
+          case nw_listener_state_ready:
+            if (!listenerStarted) {
+              listenerStarted = YES;
+              dispatch_group_leave(listenerDispatchGroup);
+            }
+          case nw_listener_state_waiting:
+          case nw_listener_state_invalid:
+            GWS_LOG_INFO(@"Listener state changed: %i", state);
+            break;
+        }
+      });
+      if (@available(iOS 12.0, macos 10.15, watchos 5.0, tvos 12.0, *)) {
+        nw_listener_set_new_connection_limit(listener, (uint32_t)maxPendingConnections);
+      }
+      nw_listener_set_new_connection_handler(listener, ^(nw_connection_t  _Nonnull connection) {
+        @autoreleasepool {
+          nw_endpoint_t remoteEndpoint = nw_connection_copy_endpoint(connection);
+          const struct sockaddr* remoteSockAddr = nw_endpoint_get_address(remoteEndpoint);
+          NSData* remoteAddress = [NSData dataWithBytes:remoteSockAddr length:sizeof(*remoteSockAddr)];
+          
+          nw_connection_set_queue(connection, dispatch_get_global_queue(self->_dispatchQueuePriority, 0));
+          
+          GCDWebServerConnection* gcdConnection = [(GCDWebServerConnection*)[self->_connectionClass alloc] initWithServer:self localAddress:localAddress remoteAddress:remoteAddress connection:connection];  // Connection will automatically retain itself while opened
+          [gcdConnection self];  // Prevent compiler from complaining about unused variable / useless statement
+        }
+      });
+      
+      dispatch_group_enter(listenerDispatchGroup);
+      nw_listener_start(listener);
+      //TODO(ermathon): dispatch sources
+    } else {
+      //TODO(ermathon): throw an error here
+    }
+  } else {
+    _source4 = [self _createDispatchSourceWithListeningSocket:listeningSocket4 isIPv6:NO];
+    _source6 = [self _createDispatchSourceWithListeningSocket:listeningSocket6 isIPv6:YES];
+  }
   _port = port;
   _bindToLocalhost = bindToLocalhost;
 
@@ -626,9 +711,21 @@ static inline NSString* _EncodeBase64(NSString* string) {
       GWS_LOG_ERROR(@"Failed creating NAT port mapping (%i)", status);
     }
   }
-
-  dispatch_resume(_source4);
-  dispatch_resume(_source6);
+  
+  if (!useNetworkFramework) {
+    dispatch_resume(_source4);
+    dispatch_resume(_source6);
+  } else {
+    dispatch_group_wait(listenerDispatchGroup, DISPATCH_TIME_FOREVER);
+    #if !OS_OBJECT_USE_OBJC_RETAIN_RELEASE
+    // TODO(ermathon): release everywhere? or not?
+    dispatch_release(listenerDispatchGroup);
+    #endif
+    if (!listenerStarted) {
+      return NO;
+    }
+  }
+  
   GWS_LOG_INFO(@"%@ started on port %i and reachable at %@", [self class], (int)_port, self.serverURL);
   if ([_delegate respondsToSelector:@selector(webServerDidStart:)]) {
     dispatch_async(dispatch_get_main_queue(), ^{
